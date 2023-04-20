@@ -1,0 +1,57 @@
+version: '2.4'
+x-image: &x-image
+  build:
+    context: ./postgre
+  image: db
+
+x-healthcheck: &x-healthcheck
+  test: psql 'host=localhost port=5432 dbname=postgres user=postgres password=postgres' -qtA -c 'select 1;' || exit 1
+  timeout: 5s
+  interval: 5s
+  retries: 5
+
+x-env: &x-env
+  POSTGRESQL_PASSWORD: postgres
+  POSTGRESQL_PGAUDIT_LOG: all, -misc
+  POSTGRESQL_DATABASE: olympicsdb
+
+services:
+  db:
+    <<: *x-image
+    ports:
+      - '5252:5432'
+    environment: *x-env
+    healthcheck: *x-healthcheck
+
+  createuser:
+    <<: *x-image
+    entrypoint: psql -h db -p 5432 -d olympicsdb -U postgres -c "CREATE ROLE olympics SUPERUSER LOGIN PASSWORD 'P@ssw0rd'"
+    environment:
+      PGPASSWORD: postgres
+    healthcheck:
+      test: psql 'host=db port=5432 dbname=olympicsdb user=olympics password=P@ssw0rd' -qtA -c 'select 1;' || exit 1
+      timeout: 10s
+      interval: 5s
+      retries: 5
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db-migrate:
+    <<: *x-image
+    entrypoint: pgmigrate -d /var/mig -c 'host=db dbname=olympicsdb user=olympics port=5432 password=P@ssw0rd' -t latest migrate
+    volumes:
+      - /home/pechenkin-al/shadgo/project_olymp/postgre:/var/mig
+    depends_on:
+      createuser:
+        condition: service_started
+
+  app:
+    volumes:
+      - /home/pechenkin-al/shadgo/project_olymp/configs:/configs
+      - /home/pechenkin-al/shadgo/project_olymp/cmd/runserver/runserver:/app/runserver
+    build:
+      context: ./package
+    image: app
+    ports:
+      - '8080:8080'

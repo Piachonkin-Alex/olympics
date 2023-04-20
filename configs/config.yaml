@@ -1,0 +1,21 @@
+server:
+  listen: "[::]:8080"
+  readTimeout: 3s
+
+storage:
+  dsn: "host=localhost port=5252 dbname=postgres user=olympics password=P@ssw0rd"
+
+auth:
+  handlers:
+    - path: /api/test
+      role: writer
+      method: GET
+    - path: /api/v1/role
+      role: admin
+      method: POST
+    - path: /api/v1/athlete
+      role: reader
+      method: GET
+    - path: /api/v1/event
+      role: writer
+      method: POST
